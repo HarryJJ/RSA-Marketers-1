@@ -1,5 +1,23 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
+class CleanData:
+    def __init__(self, start, end):
+        
+        self.start = start
+        self.end = end
+        
+        self.df = pd.read_csv('/home/harryj/Documents/RSA/Data/cripps20112014.csv')
+        self.df['date'] = pd.Series([pd.to_datetime(date) for date in self.df['date']])
+        self.df = self.df.set_index(['date'])
+
+    def cleandata(self):
+
+        idx = pd.date_range(self.start, self.end, periods=None, freq='D')
+        self.df = self.df.reindex(idx)
+        self.df = self.df.fillna(method='pad')
+        return self.df
 
 class Prediction:
 
@@ -8,7 +26,7 @@ class Prediction:
         self.Y = Y
 
         # data directory
-        self.DATA = '/home/ronald/data/cripps20112014.csv'
+        self.DATA = '/home/harryj/Documents/RSA/Data/cripps20112014.csv'
 
         # Define sum weightings as constants
         self.LastValueW = 0.001913372
@@ -32,7 +50,7 @@ class Prediction:
 
         while targetpos <= self.Y:
 
-            actualvalue = self.df['value'][self.X]
+            actualvalue = self.df['value'][targetpos]
             lastvalue = targetpos - 1
             ma_start = lastvalue - self.ma_length
             comp1week = targetpos - 2
@@ -50,10 +68,18 @@ class Prediction:
 
             targetpos += 1
 
-
-        #print self.df['predictedvalue'][self.X:self.Y]
-
         return self.df[['predictedvalue','error']][self.X:self.Y]
 
+
+def plot():
+    plt.plot(p124.predict().index, p124.predict()['predictedvalue'])
+    plt.plot(p124.predict().index, p124.predict()['error'])
+    plt.xlabel('date')
+    plt.ylabel('value')
+    plt.title('RSA: Predicted Cripps Pink Apples against actual Cripps Pink Apples')
+    plt.show()
+
+p = CleanData('07/01/2011', '31/12/2014')
+print p.cleandata()
 p124 = Prediction(124,176)
 print p124.predict()
