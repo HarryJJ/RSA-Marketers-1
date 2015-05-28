@@ -4,20 +4,21 @@ import matplotlib.pyplot as plt
 
 class CleanData:
     def __init__(self, start, end):
-        
+
         self.start = start
         self.end = end
-        
+
         self.df = pd.read_csv('/home/harryj/Documents/RSA/Data/cripps20112014.csv')
         self.df['date'] = pd.Series([pd.to_datetime(date) for date in self.df['date']])
         self.df = self.df.set_index(['date'])
 
-    def cleandata(self):
+    def clean_data(self):
 
         idx = pd.date_range(self.start, self.end, periods=None, freq='D')
         self.df = self.df.reindex(idx)
         self.df = self.df.fillna(method='pad')
         return self.df
+
 
 class Prediction:
 
@@ -29,14 +30,14 @@ class Prediction:
         self.DATA = '/home/harryj/Documents/RSA/Data/cripps20112014.csv'
 
         # Define sum weightings as constants
-        self.LastValueW = 0.001913372
-        self.Week1W = 0.0255509727
-        self.Year1W = 0.00966464649
-        self.Year2W = 0.007528915
-        self.MaW = 0.883648789
+        self.LAST_VALUE_W = 0.001913372
+        self.WEEK_1_W = 0.0255509727
+        self.YEAR_1_W = 0.00966464649
+        self.YEAR_2_W = 0.007528915
+        self.MOVING_AVERAGE_W = 0.883648789
 
         # define moving average length
-        self.ma_length = 52
+        self.MOVING_AVERAGE_LENGTH = 52
 
         # import csv
         self.df = pd.read_csv(self.DATA)
@@ -46,30 +47,30 @@ class Prediction:
     # define prediction function
     def predict(self):
 
-        targetpos = self.X
+        target_pos = self.X
 
-        while targetpos <= self.Y:
+        while target_pos <= self.Y:
 
-            actualvalue = self.df['value'][targetpos]
-            lastvalue = targetpos - 1
-            ma_start = lastvalue - self.ma_length
-            comp1week = targetpos - 2
-            comp1year = targetpos - 52
-            comp2year = targetpos - 104
-            comp_ma = np.mean(self.df['value'][ma_start:lastvalue])
+            actual_value = self.df['value'][target_pos]
+            last_value = target_pos - 1
+            moving_average_start = last_value - self.MOVING_AVERAGE_LENGTH
+            comp_1_week = target_pos - 2
+            comp_1_year = target_pos - 52
+            comp_2_year = target_pos - 104
+            comp_moving_average = np.mean(self.df['value'][moving_average_start:last_value])
 
-            predicted = self.df['value'][lastvalue] * self.LastValueW + self.df['value'][comp1week] * self.Week1W + self.df['value'][comp1year] * self.Year1W + self.df['value'][comp2year] * self.Year2W + comp_ma * self.MaW
+            predicted = self.df['value'][last_value] * self.LAST_VALUE_W + self.df['value'][comp_1_week] * self.WEEK_1_W + self.df['value'][comp_1_year] * self.YEAR_1_W + self.df['value'][comp_2_year] * self.YEAR_2_W + comp_moving_average * self.MOVING_AVERAGE_W
 
-            self.df['predictedvalue'][targetpos] = predicted
+            self.df['predictedvalue'][target_pos] = predicted
 
-            self.error = (predicted - actualvalue)/(actualvalue)
+            self.error = (predicted - actual_value)/(actual_value)
 
-            self.df['error'][targetpos] = self.error
+            self.df['error'][target_pos] = self.error
 
-            targetpos += 1
+            target_pos += 1
 
-        return self.df[['predictedvalue','error']][self.X:self.Y]
 
+        return self.df[['predictedvalue', 'error']][self.X:self.Y]
 
 def plot():
     plt.plot(p124.predict().index, p124.predict()['predictedvalue'])
@@ -80,6 +81,13 @@ def plot():
     plt.show()
 
 p = CleanData('07/01/2011', '31/12/2014')
-print p.cleandata()
-p124 = Prediction(124,176)
-print p124.predict()
+print p.clean_data()
+
+#p124 = Prediction(124,176)
+#plf = p124.predict()
+#plot()
+
+
+
+
+
