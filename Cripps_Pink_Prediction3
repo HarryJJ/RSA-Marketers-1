@@ -1,59 +1,107 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
+class CleanData:
+    def __init__(self, data_directory, column=None):
+
+        # pass data through instantiation
+        self.data_directory = data_directory
+
+        # pass column selection through instantiation
+        self.column = column
+
+        # import data into dataframe
+        self.df = pd.read_csv(self.data_directory)
+
+    def Clean(self):
+        # create datetime column and set as dataframe inex
+        self.df['datetime'] = pd.Series([pd.to_datetime(date) for date in self.df['datetime']])
+        self.df = self.df.set_index(['datetime'])
+
+        # divide by commodity variety
+        self.df = self.df.pivot_table(index=self.df.index, columns='variety', values='sale_value', aggfunc=np.sum)
+
+        # re-index to contain every date between start and end dates of available data
+        idx = pd.date_range('03/11/2008', '02/05/2015', periods=None, freq='D')
+        self.df = self.df.reindex(idx)
+
+        # Fill missing data points with value of most recent entry for any particular column (commodity variety)
+        self.df = self.df.fillna(method='pad')
+
+        if self.column == None:
+            return self.df
+        else:
+            self.df = self.df[self.column]
+            return self.df
+
 
 class Prediction:
 
-    def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
+    def __init__(self, p_start, p_end):
+        
+        #class parameters define begin and and of prediction range
+        self.p_start = p_start
+        self.p_end = p_end
 
         # data directory
         self.DATA = '/home/ronald/data/cripps20112014.csv'
-
-        # Define sum weightings as constants
-        self.LastValueW = 0.001913372
-        self.Week1W = 0.0255509727
-        self.Year1W = 0.00966464649
-        self.Year2W = 0.007528915
-        self.MaW = 0.883648789
-
-        # define moving average length
-        self.ma_length = 52
-
+        
         # import csv
         self.df = pd.read_csv(self.DATA)
+
+        # Define sum weightings as constants
+        self.LAST_VALUE_W = 0.018002537
+        self.WEEK_2_W = 0.318200251
+        self.YEAR_1_W = 0.029406001
+        self.YEAR_2_W = 0.223831008
+        self.MOVING_AVERAGE_W = 0.408821425
+
+        # define moving average length
+        self.MOVING_AVERAGE_LENGTH = 52
+
+        #define columns as null for later population (not doing this causes errors when trying to populate in predict() function?)
         self.df['predictedvalue'] = np.nan
         self.df['error'] = np.nan
+        self.df['MA'] = np.nan
+        self.TOTAL_ERROR = None
 
     # define prediction function
     def predict(self):
 
-        targetpos = self.X
+        #define each component times their weight
+        lv = self.df['value'][self.p_start-1:self.p_end-1].values * self.LAST_VALUE_W #previous value (1 week prior)
+        w2 = self.df['value'][self.p_start-2:self.p_end-2].values * self.WEEK_2_W #value 2 weeks prior
+        y1 = self.df['value'][self.p_start-52:self.p_end-52].values * self.YEAR_1_W #value 1 year prior
+        y2 = self.df['value'][self.p_start-104:self.p_end-104].values * self.YEAR_2_W #value 2 years prior
+        
+        #define rolling mean component - first populating it in the dataframe, then assigning to a separate variable with weight
+        self.df['MA'][self.p_start-self.MOVING_AVERAGE_LENGTH:self.p_end] = \
+            pd.rolling_mean(self.df['value'][self.p_start-self.MOVING_AVERAGE_LENGTH:self.p_end], self.MOVING_AVERAGE_LENGTH)
+        rm = self.df['MA'][self.p_start:self.p_end].values * self.MOVING_AVERAGE_W
 
-        while targetpos <= self.Y:
+        #weighted sum
+        self.df['predictedvalue'][self.p_start:self.p_end] = lv + w2 + y1 + y2 + rm
+        
+        #error, defined as abs(predicted - actual)/actual
+        self.df['error'][self.p_start:self.p_end] = abs(self.df['predictedvalue'][self.p_start:self.p_end] - self.df['value'][self.p_start:self.p_end])/self.df['value'][self.p_start:self.p_end]
 
-            actualvalue = self.df['value'][self.X]
-            lastvalue = targetpos - 1
-            ma_start = lastvalue - self.ma_length
-            comp1week = targetpos - 2
-            comp1year = targetpos - 52
-            comp2year = targetpos - 104
-            comp_ma = np.mean(self.df['value'][ma_start:lastvalue])
+        print self.df['predictedvalue'][self.p_start:self.p_end]
+        self.TOTAL_ERROR = np.mean(self.df['error'][self.p_start:self.p_end])
+        print 'Total average error for the predicted time range is', self.TOTAL_ERROR
+        return self.df[['predictedvalue', 'error', 'value']][self.p_start:self.p_end]
 
-            predicted = self.df['value'][lastvalue] * self.LastValueW + self.df['value'][comp1week] * self.Week1W + self.df['value'][comp1year] * self.Year1W + self.df['value'][comp2year] * self.Year2W + comp_ma * self.MaW
+def plot(source):
+    plt.plot(source.index, source['predictedvalue'], 'r-')
+    plt.plot(source.index, source['value'], 'b-')
+    plt.plot(source.index, source['error']*10, 'r^')
+    plt.xlabel('date')
+    plt.ylabel('value')
+    plt.title('RSA: Predicted CP Apples (red) vs. Actual CP Apples (blue)')
+    plt.show()
 
-            self.df['predictedvalue'][targetpos] = predicted
-
-            self.error = (predicted - actualvalue)/(actualvalue)
-
-            self.df['error'][targetpos] = self.error
-
-            targetpos += 1
-
-
-        #print self.df['predictedvalue'][self.X:self.Y]
-
-        return self.df[['predictedvalue','error']][self.X:self.Y]
+#p = CleanData('07/01/2011', '31/12/2014')
+#print p.clean_data()
 
 p124 = Prediction(124,176)
-print p124.predict()
+plot(p124.predict())
